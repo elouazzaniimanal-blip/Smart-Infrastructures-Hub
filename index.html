@@ -92,11 +92,11 @@ const nbCF = parseInt(parts[5]) || 3;
 document.getElementById('v-as').innerText = sectionValue + " cm²";
 document.getElementById('v-n1').innerText = n1 + " HA";
 document.getElementById('v-n2').innerText = n2 + " HA";
-document.getElementById('v-cf').innerText = nbCF + " unités";
+document.getElementById('v-cf').innerText = n2 + " cadres (Resserrés)";
 
 const btnNdc = document.getElementById('btn-ndc');
 if (type === "CORBEAU") {
-    btnNdc.onclick = () => alert('Note de Structure : WinCorbeau\nEurocode 2 : CONFORME ✅');
+    btnNdc.onclick = () => alert('Note de Structure : WinCorbeau\nEurocode 2 : CONFORME ✅\nL\'Eurocode 2 impose de resserrer ces cadres dans la zone où le corbeau "pousse" sur le poteau pour éviter que le béton n\'éclate.');
 } else {
     btnNdc.onclick = () => alert('Note de Structure : WinSemelle\nEurocode 2 : CONFORME ✅');
 }
@@ -115,7 +115,6 @@ document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['
 const group = new THREE.Group();
 scene.add(group);
 
-// --- FONCTION CONTOURS NOIRS (NOUVEAU) ---
 function addEdges(mesh) {
     const edges = new THREE.EdgesGeometry(mesh.geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
@@ -136,13 +135,19 @@ const matOrange = new THREE.MeshStandardMaterial({
     roughness: 0.2 
 });
 const matLineOrange = new THREE.LineBasicMaterial({ color: 0xff6b00 });
+
 const matBlanc = new THREE.MeshStandardMaterial({ 
     color: 0xffffff, 
     transparent: true, 
-    opacity: 0.5,
+    opacity: 0.8,
     metalness: 0.5,
-    roughness: 0.3
+    roughness: 0.3,
+    depthTest: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
 });
+
 const matSocle = new THREE.MeshStandardMaterial({ 
     color: 0x666666, 
     transparent: true, 
@@ -179,6 +184,14 @@ if (type === "CORBEAU") {
         bp.position.set((i < 2 ? -0.15 : 0.15), 0, (i % 2 === 0 ? -0.15 : 0.15));
         addEdges(bp);
         group.add(bp);
+    }
+
+    // --- AJOUT DES CADRES DE CONFINEMENT DANS LE POTEAU (RESSERREMENT EC2) ---
+    for(let k = 0; k < n2; k++) {
+        const yCadre = (h/2) - (k * 0.12); // Resserrement visuel
+        const dimP = 0.42; 
+        const ptsP = [new THREE.Vector3(-dimP/2, yCadre, -dimP/2), new THREE.Vector3(dimP/2, yCadre, -dimP/2), new THREE.Vector3(dimP/2, yCadre, dimP/2), new THREE.Vector3(-dimP/2, yCadre, dimP/2), new THREE.Vector3(-dimP/2, yCadre, -dimP/2)];
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsP), matLineOrange));
     }
 
     for(let i=0; i<n1; i++){
@@ -253,8 +266,11 @@ if (type === "CORBEAU") {
         group.add(bX);
     }
     for(let j=0; j<n2; j++){
-        const bY = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1, 8), matBlanc);
-        bY.rotation.z = Math.PI/2; bY.position.set(0, bL+0.1, -(L-0.2)/2 + (j*(L-0.2)/(n2-1||1)));
+        const bY = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1, 8), 
+            new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.8, roughness: 0.2, transparent: false }) 
+        );
+        bY.rotation.z = Math.PI/2; 
+        bY.position.set(0, bL+0.11, -(L-0.2)/2 + (j*(L-0.2)/(n2-1||1)));
         addEdges(bY);
         group.add(bY);
     }
