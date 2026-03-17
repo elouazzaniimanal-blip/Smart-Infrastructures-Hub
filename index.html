@@ -35,7 +35,6 @@
         .btn-co2 { background: #1e7e34; color: white; }
         .btn-magique:hover { opacity: 0.8; transform: translateX(5px); }
 
-        /* Style pour le bouton AR natif */
         #ARButton {
             border: 1px solid #ff6b00 !important;
             background: rgba(17, 17, 17, 0.9) !important;
@@ -71,7 +70,6 @@
     </div>
 
 <script type="module">
-// Importation des outils AR officiels
 import { ARButton } from 'https://unpkg.com/three@0.128.0/examples/jsm/webxr/ARButton.js';
 
 // --- CONFIGURATION ---
@@ -96,7 +94,6 @@ document.getElementById('v-n1').innerText = n1 + " HA";
 document.getElementById('v-n2').innerText = n2 + " HA";
 document.getElementById('v-cf').innerText = nbCF + " unités";
 
-// --- GESTION DES ALERTES NOTE DE CALCUL ---
 const btnNdc = document.getElementById('btn-ndc');
 if (type === "CORBEAU") {
     btnNdc.onclick = () => alert('Note de Structure : WinCorbeau\nEurocode 2 : CONFORME ✅');
@@ -110,22 +107,50 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHei
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.xr.enabled = true; // ACTIVATION AR
+renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// Ajout du bouton AR
 document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
 
 const group = new THREE.Group();
 scene.add(group);
 
-const matBeton = new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.25 });
-const matOrange = new THREE.MeshStandardMaterial({ color: 0xff6b00, metalness: 0.8 });
-const matLineOrange = new THREE.LineBasicMaterial({ color: 0xff6b00 });
-const matBlanc = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 });
-const matSocle = new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.25 });
+// --- FONCTION CONTOURS NOIRS (NOUVEAU) ---
+function addEdges(mesh) {
+    const edges = new THREE.EdgesGeometry(mesh.geometry);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+    mesh.add(line);
+}
 
-scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+// --- MATERIAUX AMELIORES ---
+const matBeton = new THREE.MeshStandardMaterial({ 
+    color: 0x888888, 
+    transparent: true, 
+    opacity: 0.3,
+    roughness: 0.9,
+    metalness: 0.1
+});
+const matOrange = new THREE.MeshStandardMaterial({ 
+    color: 0xff6b00, 
+    metalness: 1.0, 
+    roughness: 0.2 
+});
+const matLineOrange = new THREE.LineBasicMaterial({ color: 0xff6b00 });
+const matBlanc = new THREE.MeshStandardMaterial({ 
+    color: 0xffffff, 
+    transparent: true, 
+    opacity: 0.5,
+    metalness: 0.5,
+    roughness: 0.3
+});
+const matSocle = new THREE.MeshStandardMaterial({ 
+    color: 0x666666, 
+    transparent: true, 
+    opacity: 0.4,
+    roughness: 0.9
+});
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 const sun = new THREE.DirectionalLight(0xffffff, 1.2);
 sun.position.set(5, 10, 7.5);
 scene.add(sun);
@@ -141,20 +166,26 @@ if (type === "CORBEAU") {
     const geom = new THREE.ExtrudeGeometry(shape, { depth: b, bevelEnabled: false });
     const mesh = new THREE.Mesh(geom, matBeton);
     mesh.position.set(0.25, h/2, -b/2);
+    addEdges(mesh);
     group.add(mesh);
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.5), matBeton));
+
+    const poteauMain = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.5, 0.5), matBeton);
+    addEdges(poteauMain);
+    group.add(poteauMain);
 
     const hauteurPoteau = 2.0; 
     for(let i=0; i<4; i++) {
-        const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, hauteurPoteau), matOrange);
+        const bp = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, hauteurPoteau, 8), matOrange);
         bp.position.set((i < 2 ? -0.15 : 0.15), 0, (i % 2 === 0 ? -0.15 : 0.15));
+        addEdges(bp);
         group.add(bp);
     }
 
     for(let i=0; i<n1; i++){
-        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.75), matOrange);
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.75, 8), matOrange);
         bar.rotation.z = Math.PI/2;
         bar.position.set(0.45, h/2 - 0.05, -b/2 + 0.05 + (i*(b-0.1)/(n1-1||1)));
+        addEdges(bar);
         group.add(bar);
     }
     for(let j=0; j<n2; j++){
@@ -173,6 +204,7 @@ if (type === "CORBEAU") {
 
     const socle = new THREE.Mesh(new THREE.BoxGeometry(L, eRadier, L), matSocle);
     socle.position.y = -totalH/2 + eRadier/2;
+    addEdges(socle);
     group.add(socle);
 
     const s = new THREE.Shape();
@@ -182,17 +214,20 @@ if (type === "CORBEAU") {
     s.holes.push(hole);
     const fut = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: hf, bevelEnabled: false }), matBeton);
     fut.rotation.x = Math.PI / 2; fut.position.y = -totalH/2 + eRadier + hf;
+    addEdges(fut);
     group.add(fut);
 
     const hPV = hf + 0.8;
     const poteau = new THREE.Mesh(new THREE.BoxGeometry(poteauA-0.05, hPV, poteauA-0.05), matBlanc);
     poteau.position.y = -totalH/2 + eRadier + hPV/2 - 0.1;
+    addEdges(poteau);
     group.add(poteau);
 
     const posA = [{x: 1, z: 1}, {x: 1, z: -1}, {x: -1, z: 1}, {x: -1, z: -1}];
     posA.forEach(p => {
-        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, hPV + 0.2), matOrange);
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, hPV + 0.2, 8), matOrange);
         bar.position.set(((poteauA/2)-0.06)*p.x, poteau.position.y, ((poteauA/2)-0.06)*p.z);
+        addEdges(bar);
         group.add(bar);
     });
 
@@ -212,13 +247,15 @@ if (type === "CORBEAU") {
 
     const bL = -totalH/2;
     for(let i=0; i<n1; i++){
-        const bX = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1), matOrange);
+        const bX = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1, 8), matOrange);
         bX.rotation.x = Math.PI/2; bX.position.set(-(L-0.2)/2 + (i*(L-0.2)/(n1-1||1)), bL+0.07, 0);
+        addEdges(bX);
         group.add(bX);
     }
     for(let j=0; j<n2; j++){
-        const bY = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1), matBlanc);
+        const bY = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, L-0.1, 8), matBlanc);
         bY.rotation.z = Math.PI/2; bY.position.set(0, bL+0.1, -(L-0.2)/2 + (j*(L-0.2)/(n2-1||1)));
+        addEdges(bY);
         group.add(bY);
     }
 }
@@ -244,7 +281,6 @@ scene.add(controller);
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 
-// --- BOUCLE D'ANIMATION UNIFIÉE ---
 function animate(timestamp, frame) {
     if (frame) {
         const referenceSpace = renderer.xr.getReferenceSpace();
@@ -271,7 +307,6 @@ function animate(timestamp, frame) {
         }
     }
 
-    // Rotation uniquement si pas en mode AR
     if (!renderer.xr.isPresenting) {
         group.rotation.y += 0.004;
         camera.position.set(2.8, 2.2, 2.8);
